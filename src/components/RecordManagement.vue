@@ -56,7 +56,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { db } from '../firebaseConfig';
 
 const records = ref([]);
 const selectedMonth = ref(new Date().toISOString().slice(0, 7)); // 預設當月 YYYY-MM

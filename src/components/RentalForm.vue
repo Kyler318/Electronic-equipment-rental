@@ -24,7 +24,7 @@
 <script setup>
 import { ref } from 'vue';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../firebaseConfig'; // 你的 firebase 初始化文件
+import { db } from '../firebaseConfig'; // 你的 firebase 初始化文件
 
 const borrowerName = ref('');
 const items = ref([{ type: '手提電腦', customType: '', assetId: '', isReturned: false, returnTime: null }]);
