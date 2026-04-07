@@ -1,74 +1,85 @@
 <template>
-  <el-container style="height: 100vh;">
-    
+  <router-view v-if="route.path === '/login'" />
+
+  <el-container v-else style="height: 100vh;">
     <el-aside width="220px" style="background-color: #304156;">
       <div style="height: 60px; line-height: 60px; text-align: center; color: white; font-size: 18px; font-weight: bold; border-bottom: 1px solid #1f2d3d;">
-        💻 設備租借系統
+        💻 設備支援及租借系統
       </div>
       
       <el-menu
-        :default-active="currentView"
+        :default-active="route.path"
+        router
         class="el-menu-vertical-demo"
         background-color="#304156"
         text-color="#bfcbd9"
         active-text-color="#409EFF"
         style="border-right: none;"
-        @select="handleSelect"
       >
-        <el-menu-item index="rental">
-          <el-icon><EditPen /></el-icon>
-          <span>新增租借</span>
+      <el-menu-item index="/dashboard">
+          <el-icon><DataLine /></el-icon>
+          <span>數據儀表板</span>
         </el-menu-item>
         
-        <el-menu-item index="management">
-          <el-icon><List /></el-icon>
-          <span>歸還與管理</span>
-        </el-menu-item>
+        <el-menu-item-group title="設備租借">
+          <el-menu-item index="/rental"><el-icon><EditPen /></el-icon><span>新增租借</span></el-menu-item>
+          <el-menu-item index="/management"><el-icon><List /></el-icon><span>歸還與管理</span></el-menu-item>
+          <el-menu-item index="/inventory"><el-icon><Box /></el-icon><span>庫存總表</span></el-menu-item>
+        </el-menu-item-group>
+
+        <el-menu-item-group title="IT 支援">
+          <el-menu-item index="/it-form"><el-icon><Monitor /></el-icon><span>新增支援請求</span></el-menu-item>
+          <el-menu-item index="/it-management"><el-icon><Calendar /></el-icon><span>支援管理與記錄</span></el-menu-item>
+        </el-menu-item-group>
       </el-menu>
     </el-aside>
 
     <el-container>
-      <el-header style="background-color: white; box-shadow: 0 1px 4px rgba(0,21,41,.08); display: flex; align-items: center;">
-        <h2 style="margin: 0; font-size: 20px; color: #303133;">
-          {{ currentView === 'rental' ? '新增租借記錄' : '資產管理與歸還' }}
-        </h2>
+      <el-header style="background-color: white; box-shadow: 0 1px 4px rgba(0,21,41,.08); display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="margin: 0; font-size: 20px; color: #303133;">系統管理台</h2>
+        <div>
+          <template v-if="currentUserDisplayName">
+            <span style="margin-right: 15px; font-weight: bold; color: #409EFF;">👤 {{ currentUserDisplayName }}</span>
+            <el-button type="danger" size="small" plain @click="handleLogout">登出</el-button>
+          </template>
+          
+          <template v-else>
+            <el-button type="primary" size="small" plain @click="router.push('/login')">👨‍💻 資訊科技部人員登入</el-button>
+          </template>
+        </div>
       </el-header>
       
       <el-main style="background-color: #f0f2f5;">
-        <RentalForm v-if="currentView === 'rental'" />
-        <RecordManagement v-if="currentView === 'management'" />
-      </el-main>
+        <router-view /> </el-main>
     </el-container>
-
   </el-container>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import RentalForm from './components/RentalForm.vue';
-import RecordManagement from './components/RecordManagement.vue';
-// 引入我們需要的兩個圖示
-import { EditPen, List } from '@element-plus/icons-vue';
+import { ref, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { auth } from './firebaseConfig';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { EditPen, List, Monitor, Calendar, Box, DataLine } from '@element-plus/icons-vue';
 
-const currentView = ref('rental');
+const route = useRoute();
+const router = useRouter();
+const currentUserDisplayName = ref('');
 
-// 處理選單點擊切換頁面
-const handleSelect = (index) => {
-  currentView.value = index;
+// 監聽目前登入的用戶並取得名字
+onMounted(() => {
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      currentUserDisplayName.value = user.displayName || user.email;
+    } else {
+      // 確保登出時清空名字
+      currentUserDisplayName.value = '';
+    }
+  });
+});
+
+const handleLogout = async () => {
+  await signOut(auth);
+  router.push('/login');
 };
 </script>
-
-<style>
-body {
-  margin: 0;
-  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
-}
-/* 讓捲軸漂亮一點 */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: #c0c4cc;
-  border-radius: 4px;
-}
-</style>

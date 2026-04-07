@@ -44,10 +44,14 @@
         </template>
 
         <div v-for="item in record.items" :key="item.id" style="margin-bottom: 10px;">
-          <div v-if="item.isReturned" style="color: #a8abb2;">
+          <div v-if="item.isReturned" style="color: #a8abb2; margin-bottom: 5px;">
             <el-tag type="info" style="margin-right: 10px;">已歸還</el-tag>
             <span style="text-decoration: line-through;">{{ item.type === '其他' ? item.customType : item.type }} ({{ item.assetId }})</span>
             <span style="font-size: 12px; margin-left: 10px;">還於: {{ formatDate(item.returnTime) }}</span>
+            
+            <span v-if="item.returnOperator" style="font-size: 12px; margin-left: 10px; color: #409EFF;">
+              👤 歸還操作人：{{ item.returnOperator }}
+            </span>
           </div>
           
           <div v-else>
@@ -72,7 +76,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db,auth } from '../firebaseConfig';
 import { ElMessage } from 'element-plus';
 
 const records = ref([]);
@@ -128,23 +132,50 @@ const fetchRecords = async () => {
 
 const submitReturn = async (recordId) => {
   const selectedItemIds = returnSelection.value[recordId];
+  if (!selectedItemIds || selectedItemIds.length === 0) return;
+
   const recordIndex = records.value.findIndex(r => r.id === recordId);
   const currentRecord = records.value[recordIndex];
+  const operatorName = auth.currentUser?.displayName || auth.currentUser?.email || '系統管理員';
+
+  // 整理出被勾選準備歸還的設備
+  const returnedItemsList = []; 
 
   const updatedItems = currentRecord.items.map(item => {
     if (selectedItemIds.includes(item.id)) {
-      return { ...item, isReturned: true, returnTime: new Date() };
+      returnedItemsList.push(item); // 收集起來等一下要去改庫存
+      return { 
+        ...item, 
+        isReturned: true, 
+        returnTime: new Date(),
+        returnOperator: operatorName 
+      };
     }
     return item;
   });
 
   try {
+    // 1. 更新租借記錄為「已歸還」
     const recordRef = doc(db, "rentals", recordId);
     await updateDoc(recordRef, { items: updatedItems });
 
+    // 2. 核心動作：把總庫存的狀態改回「可借用」
+    for (const item of returnedItemsList) {
+      // 為了相容以前沒有 inventoryId 的舊記錄，我們用 assetId 去尋找庫存並更新
+      const q = query(collection(db, "inventory"), where("assetId", "==", item.assetId));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // 找到該資產，把狀態改回可借用
+        const invDocId = querySnapshot.docs[0].id;
+        await updateDoc(doc(db, "inventory", invDocId), { status: '可借用' });
+      }
+    }
+
+    // 3. 更新前端畫面
     records.value[recordIndex].items = updatedItems;
     returnSelection.value[recordId] = [];
-    ElMessage.success('設備歸還成功！');
+    ElMessage.success('設備歸還成功！庫存已自動釋放。');
   } catch (error) {
     console.error("更新錯誤", error);
     ElMessage.error('歸還操作失敗，請重試。');

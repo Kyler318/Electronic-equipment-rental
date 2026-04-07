@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth"; // 新增這行
 
-// 使用 import.meta.env 來讀取 .env 檔案中的變數
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -11,8 +11,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// 初始化 Firebase
 const app = initializeApp(firebaseConfig);
-
-// 導出 Firestore 資料庫實例，讓其他 Vue 元件可以使用
 export const db = getFirestore(app);
+export const auth = getAuth(app); // 新增這行並匯出
