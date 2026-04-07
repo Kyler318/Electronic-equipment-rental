@@ -1,55 +1,71 @@
 <template>
   <div class="management-page">
-    <h2>資產管理與歸還</h2>
     
-    <div class="summary-board">
-      <h3>未還設備概覽</h3>
-      <ul>
-        <li v-for="(summary, name) in unreturnedSummary" :key="name">
-          <strong>{{ name }}</strong>: 剩餘 {{ summary.count }} 部 
-          (類型: {{ summary.types.join(', ') }})
-        </li>
-      </ul>
+    <el-card shadow="never" style="margin-bottom: 20px; background-color: #fdf6ec;">
+      <template #header>
+        <span style="font-weight: bold; color: #e6a23c;">⚠️ 未還設備概覽</span>
+      </template>
+      <div v-if="Object.keys(unreturnedSummary).length === 0" style="color: #909399;">
+        目前所有設備均已歸還。
+      </div>
+      <div v-else>
+        <p v-for="(summary, name) in unreturnedSummary" :key="name" style="margin: 5px 0;">
+          <strong style="font-size: 16px;">{{ name }}</strong>：剩餘 <el-tag type="danger" round>{{ summary.count }}</el-tag> 部 
+          <span style="color: #606266; font-size: 13px;">(類型: {{ summary.types.join(', ') }})</span>
+        </p>
+      </div>
+    </el-card>
+
+    <div style="margin-bottom: 20px;">
+      <span style="margin-right: 10px; font-weight: bold; color: #606266;">選擇查詢月份：</span>
+      <el-date-picker
+        v-model="selectedMonth"
+        type="month"
+        placeholder="選擇月份"
+        value-format="YYYY-MM"
+        @change="fetchRecords"
+      />
     </div>
 
-    <div class="filters">
-      <input type="month" v-model="selectedMonth" @change="fetchRecords" />
-    </div>
-
-    <div class="records-list">
-      <div 
+    <el-space direction="vertical" fill style="width: 100%;">
+      <el-card 
         v-for="record in records" 
         :key="record.id" 
-        class="record-card"
-        :class="{ 'highlight': activeRecordId === record.id }"
+        shadow="hover"
+        :style="activeRecordId === record.id ? 'border: 2px solid #67C23A;' : ''"
         @click="activeRecordId = record.id"
+        style="cursor: pointer;"
       >
-        <p><strong>{{ record.borrowerName }}</strong> - {{ formatDate(record.borrowTime) }}</p>
-        
-        <ul>
-          <li v-for="item in record.items" :key="item.id">
-            <span :class="{ 'returned-text': item.isReturned }">
-              {{ item.type === '其他' ? item.customType : item.type }} ({{ item.assetId }})
-            </span>
-            <span v-if="item.isReturned"> - 已歸還於 {{ formatDate(item.returnTime) }}</span>
-            
-            <input 
-              v-else 
-              type="checkbox" 
-              :value="item.id" 
-              v-model="returnSelection[record.id]" 
-            />
-          </li>
-        </ul>
-        
-        <button 
-          v-if="returnSelection[record.id]?.length > 0" 
-          @click="submitReturn(record.id)"
-        >
-          確認歸還勾選設備
-        </button>
-      </div>
-    </div>
+        <template #header>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 16px; font-weight: bold;">👤 {{ record.borrowerName }}</span>
+            <span style="color: #909399; font-size: 14px;">借出時間：{{ formatDate(record.borrowTime) }}</span>
+          </div>
+        </template>
+
+        <div v-for="item in record.items" :key="item.id" style="margin-bottom: 10px;">
+          <div v-if="item.isReturned" style="color: #a8abb2;">
+            <el-tag type="info" style="margin-right: 10px;">已歸還</el-tag>
+            <span style="text-decoration: line-through;">{{ item.type === '其他' ? item.customType : item.type }} ({{ item.assetId }})</span>
+            <span style="font-size: 12px; margin-left: 10px;">還於: {{ formatDate(item.returnTime) }}</span>
+          </div>
+          
+          <div v-else>
+            <el-checkbox v-model="returnSelection[record.id]" :label="item.id">
+              <el-tag type="warning" style="margin-right: 10px;">未歸還</el-tag>
+              <span style="font-weight: bold; color: #303133;">{{ item.type === '其他' ? item.customType : item.type }}</span> 
+              <span style="color: #606266;"> (資產編號: {{ item.assetId }})</span>
+            </el-checkbox>
+          </div>
+        </div>
+
+        <div style="margin-top: 15px; text-align: right;" v-if="returnSelection[record.id]?.length > 0">
+          <el-button type="success" @click.stop="submitReturn(record.id)">確認歸還勾選設備</el-button>
+        </div>
+      </el-card>
+      
+      <el-empty v-if="records.length === 0" description="該月份無租借記錄" />
+    </el-space>
   </div>
 </template>
 
@@ -57,13 +73,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { ElMessage } from 'element-plus';
 
 const records = ref([]);
-const selectedMonth = ref(new Date().toISOString().slice(0, 7)); // 預設當月 YYYY-MM
-const returnSelection = ref({}); // 追蹤每個記錄中被勾選準備歸還的設備 ID
-const activeRecordId = ref(null); // 用於高亮點選的記錄
+const selectedMonth = ref(new Date().toISOString().slice(0, 7));
+const returnSelection = ref({});
+const activeRecordId = ref(null);
 
-// 計算屬性：自動整理頂部的未還清單
 const unreturnedSummary = computed(() => {
   const summary = {};
   records.value.forEach(record => {
@@ -79,40 +95,42 @@ const unreturnedSummary = computed(() => {
     });
   });
   
-  // 將 Set 轉為 Array 方便顯示
   for (let name in summary) {
     summary[name].types = Array.from(summary[name].types);
   }
   return summary;
 });
 
-// 讀取資料邏輯 (包含月份篩選)
 const fetchRecords = async () => {
+  if (!selectedMonth.value) return;
+  
   const startDate = new Date(`${selectedMonth.value}-01T00:00:00`);
   const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59);
 
-  const q = query(
-    collection(db, "rentals"),
-    where("borrowTime", ">=", startDate),
-    where("borrowTime", "<=", endDate)
-  );
+  try {
+    const q = query(
+      collection(db, "rentals"),
+      where("borrowTime", ">=", startDate),
+      where("borrowTime", "<=", endDate)
+    );
 
-  const querySnapshot = await getDocs(q);
-  records.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  
-  // 初始化 Checkbox 狀態物件
-  records.value.forEach(r => {
-    if (!returnSelection.value[r.id]) returnSelection.value[r.id] = [];
-  });
+    const querySnapshot = await getDocs(q);
+    records.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    records.value.forEach(r => {
+      if (!returnSelection.value[r.id]) returnSelection.value[r.id] = [];
+    });
+  } catch (error) {
+    console.error("讀取錯誤", error);
+    ElMessage.error('讀取資料失敗');
+  }
 };
 
-// 提交部分歸還
 const submitReturn = async (recordId) => {
   const selectedItemIds = returnSelection.value[recordId];
   const recordIndex = records.value.findIndex(r => r.id === recordId);
   const currentRecord = records.value[recordIndex];
 
-  // 更新本地陣列與加上歸還時間
   const updatedItems = currentRecord.items.map(item => {
     if (selectedItemIds.includes(item.id)) {
       return { ...item, isReturned: true, returnTime: new Date() };
@@ -120,19 +138,21 @@ const submitReturn = async (recordId) => {
     return item;
   });
 
-  // 更新 Firebase
-  const recordRef = doc(db, "rentals", recordId);
-  await updateDoc(recordRef, { items: updatedItems });
+  try {
+    const recordRef = doc(db, "rentals", recordId);
+    await updateDoc(recordRef, { items: updatedItems });
 
-  // 更新 UI 狀態
-  records.value[recordIndex].items = updatedItems;
-  returnSelection.value[recordId] = []; // 清空該記錄的勾選
-  alert('歸還紀錄已更新！');
+    records.value[recordIndex].items = updatedItems;
+    returnSelection.value[recordId] = [];
+    ElMessage.success('設備歸還成功！');
+  } catch (error) {
+    console.error("更新錯誤", error);
+    ElMessage.error('歸還操作失敗，請重試。');
+  }
 };
 
 const formatDate = (dateInput) => {
   if (!dateInput) return '';
-  // 處理 Firebase Timestamp 或 JS Date
   const d = dateInput.toDate ? dateInput.toDate() : new Date(dateInput);
   return d.toLocaleString('zh-HK');
 };
@@ -141,21 +161,3 @@ onMounted(() => {
   fetchRecords();
 });
 </script>
-
-<style>
-/* 高亮與樣式 */
-.highlight {
-  border: 2px solid #42b983;
-  background-color: #f0f9f4;
-}
-.returned-text {
-  text-decoration: line-through;
-  color: #888;
-}
-.summary-board {
-  background: #f8f9fa;
-  padding: 15px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-}
-</style>
