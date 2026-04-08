@@ -72,7 +72,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { auth } from './firebaseConfig';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { EditPen, List, Monitor, Calendar, Box, DataLine, DocumentChecked } from '@element-plus/icons-vue';
+import { EditPen, List, Monitor, Calendar, Box, DataLine, DocumentChecked, Document } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const router = useRouter();
