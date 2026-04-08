@@ -11,6 +11,8 @@ const routes = [
   { path: '/it-management', component: () => import('../components/ITSupportManagement.vue'), meta: { requiresAuth: true } },
   { path: '/inventory', component: () => import('../components/InventoryManagement.vue'), meta: { requiresAuth: true } },
   { path: '/dashboard', component: () => import('../components/Dashboard.vue'), meta: { requiresAuth: true } },
+  { path: '/tasks', component: () => import('../components/NonTeachingTasks.vue'), meta: { requiresAuth: true } },
+  { path: '/leave-app', component: () => import('../components/LeaveApplication.vue'), meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

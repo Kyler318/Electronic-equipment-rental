@@ -19,7 +19,19 @@
       <el-menu-item index="/dashboard">
           <el-icon><DataLine /></el-icon>
           <span>數據儀表板</span>
+      </el-menu-item>
+
+      <el-menu-item-group title="工作與任務">
+        <el-menu-item index="/tasks">
+          <el-icon><DocumentChecked /></el-icon>
+          <span>非教學任務職責</span>
         </el-menu-item>
+
+      <el-menu-item index="/leave-app">
+        <el-icon><Document /></el-icon>
+        <span>行政表單申請</span>
+      </el-menu-item>
+      </el-menu-item-group>
         
         <el-menu-item-group title="設備租借">
           <el-menu-item index="/rental"><el-icon><EditPen /></el-icon><span>新增租借</span></el-menu-item>
@@ -60,7 +72,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { auth } from './firebaseConfig';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { EditPen, List, Monitor, Calendar, Box, DataLine } from '@element-plus/icons-vue';
+import { EditPen, List, Monitor, Calendar, Box, DataLine, DocumentChecked } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const router = useRouter();

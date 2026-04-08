@@ -5,6 +5,13 @@
       <el-tab-pane label="📅 待處理排期表" name="pending">
         <el-alert title="以下為尚未完成的排期支援任務，完成後請點擊「標記為已完成」。" type="warning" show-icon style="margin-bottom: 20px;" />
         
+        <div style="margin-bottom: 15px; text-align: right;" v-if="pendingRecords.length > 0">
+          <el-radio-group v-model="pendingSort" size="small">
+            <el-radio-button label="time">🕒 依時間排序</el-radio-button>
+            <el-radio-button label="name">👤 依人員姓名</el-radio-button>
+          </el-radio-group>
+        </div>
+
         <el-empty v-if="pendingRecords.length === 0" description="目前沒有待處理的排期" />
         
         <el-space direction="vertical" fill style="width: 100%;">
@@ -23,6 +30,14 @@
       </el-tab-pane>
 
       <el-tab-pane label="📁 歷史支援記錄" name="completed">
+        
+        <div style="margin-bottom: 15px; text-align: right;" v-if="completedRecords.length > 0">
+          <el-radio-group v-model="completedSort" size="small">
+            <el-radio-button label="time">🕒 最新完成優先</el-radio-button>
+            <el-radio-button label="name">👤 依人員姓名</el-radio-button>
+          </el-radio-group>
+        </div>
+
         <el-empty v-if="completedRecords.length === 0" description="目前沒有已完成的記錄" />
         
         <el-space direction="vertical" fill style="width: 100%;">
@@ -53,24 +68,41 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { collection, query, getDocs, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { ElMessage } from 'element-plus';
 
 const records = ref([]);
 const activeTab = ref('pending');
 
-// 自動分類：待處理的排期
+// 新增：用來控制排序狀態的變數
+const pendingSort = ref('time');
+const completedSort = ref('time');
+
+// 自動分類與排序：待處理的排期
 const pendingRecords = computed(() => {
-  return records.value.filter(r => r.status === 'pending');
+  let list = records.value.filter(r => r.status === 'pending');
+  
+  if (pendingSort.value === 'name') {
+    // 依中文姓名筆畫/拼音排序
+    return list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK'));
+  } else {
+    // 預設（不特別排序人名），依預定時間先後排序
+    return list.sort((a, b) => (a.scheduledTime?.toDate() || 0) - (b.scheduledTime?.toDate() || 0));
+  }
 });
 
-// 自動分類：已完成的記錄 (包含即時支援與已完成的排期)
+// 自動分類與排序：已完成的記錄
 const completedRecords = computed(() => {
-  // 讓最新的完成記錄排在最上面
-  return records.value.filter(r => r.status === 'completed').sort((a, b) => {
-    return (b.completionTime?.toDate() || 0) - (a.completionTime?.toDate() || 0);
-  });
+  let list = records.value.filter(r => r.status === 'completed');
+  
+  if (completedSort.value === 'name') {
+    // 依中文姓名筆畫/拼音排序
+    return list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK'));
+  } else {
+    // 預設（不特別排序人名），讓最新的完成記錄排在最上面
+    return list.sort((a, b) => (b.completionTime?.toDate() || 0) - (a.completionTime?.toDate() || 0));
+  }
 });
 
 const fetchRecords = async () => {
